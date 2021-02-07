@@ -28,7 +28,15 @@ const nodeHandler = {
 
 		return obj[name] //返回对象方法
 	},
-	MemberExpression(){},
+	// 表达式节点处理器
+	// 形如 person.say
+	MemberExpression(nodeIterator){
+		// 获取对象
+		const obj = nodeIterator.node.traverse(nodeIterator.node.object);
+		// 获取对象方法
+		const name = nodeIterator.node.property.name;
+		return obj[name] 
+	},
 	// 表达式调用节点处理器
 	// fix func()，console.log()
 	CallExpression(nodeIterator){
@@ -52,6 +60,34 @@ const nodeHandler = {
 	// 字符节点处理器 返回节点的值
 	Literal(nodeIterator){
 		return nodeIterator.node.value;
+	},
+	// 块级声明节点处理器
+	// 函数 循环 等
+	BlockStatement(nodeIterator){
+		// 定义块级作用域
+		let scope = nodeIterator.createScope('block');
+		
+    // 处理块级节点内的每一个节点
+    for (const node of nodeIterator.node.body) {
+		if (node.type === 'VariableDeclaration' && node.kind === 'var') {
+		  	for (const declaration of node.declarations) {
+				scope.declare(declaration.id.name, declaration.init.value, node.kind)
+		  	}
+		} else if (node.type === 'FunctionDeclaration') {
+		  	nodeIterator.traverse(node, { scope })
+		}
+	  }
+  
+	  // 提取关键字（return, break, continue）
+	  for (const node of nodeIterator.node.body) {
+			if (node.type === 'FunctionDeclaration') {
+		  		continue
+			}
+			const signal = nodeIterator.traverse(node, { scope })
+			if (Signal.isSignal(signal)) {
+		  		return signal
+			}
+	  	}
 	}
 
 }
